@@ -1,0 +1,80 @@
+# ansible-playbook -v -i hosts playbooks/setup-unipi.yml -u pi --ask-pass
+
+#TODO: Add hostname
+#TODO: Add nginx proxy w/SSL
+#TODO: Remove password for 'pi' user
+
+---
+- hosts: rpi1
+  gather_facts: yes
+  become: true
+  tasks:
+    # Run apt-get update and apt-get upgrade
+    - include: ../tasks/update.yml
+      tags: update
+
+    - name: Add ssh keys
+      authorized_key:
+        user: pi
+        state: present
+        key: https://github.com/jmhale.keys
+
+    - name: Add Ubnt repo key
+      apt_key:
+        keyserver: keyserver.ubuntu.com
+        id: C0A52C50
+
+    - name: Add Ubnt repo
+      apt_repository:
+        repo: deb http://www.ubnt.com/downloads/unifi/debian stable ubiquiti
+        state: present
+
+    # Update apt packages
+    - name: Update apt packages
+      become: yes
+      apt:
+        update_cache=yes
+
+    # Install Unifi controller
+    - name: Install Unifi controller
+      apt:
+        name: unifi
+        state: present
+
+    - name: Disable separate MongoDB
+      lineinfile: dest=/etc/mongodb.conf
+                  regexp=''
+                  insertafter=EOF
+                  line='ENABLE_MONGODB=no'
+
+    - name: Remove old Snappy library
+      file:
+        state: absent
+        path: /usr/lib/unifi/lib/snappy-java-1.0.5.jar
+
+    - name: Download new Snappy library
+      get_url:
+        url: https://repo1.maven.org/maven2/org/xerial/snappy/snappy-java/1.1.2.6/snappy-java-1.1.2.6.jar
+        dest: /usr/lib/unifi/lib/snappy-java-1.1.2.6.jar
+
+    - name: Symlink new Snappy library
+      file:
+        src: /usr/lib/unifi/lib/snappy-java-1.1.2.6.jar
+        dest: /usr/lib/unifi/lib/snappy-java-1.0.5.jar
+        state: link
+
+    - name: Install JDK 8
+      apt:
+        name: oracle-java8-jdk
+        state: present
+
+    - name: Set JDK 8 as default
+      lineinfile: dest=/etc/default/unifi
+                  regexp=''
+                  insertafter=EOF
+                  create=yes
+                  line='JAVA_HOME=/usr/lib/jvm/jdk-8-oracle-arm32-vfp-hflt'
+
+  handlers:
+    - include: ../handlers/reboot.yml
+      tags: system
