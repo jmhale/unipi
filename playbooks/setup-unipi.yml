@@ -3,6 +3,7 @@
 #TODO: Add hostname
 #TODO: Add nginx proxy w/SSL
 #TODO: Remove password for 'pi' user
+#TODO: Fix reboot handler
 
 ---
 - hosts: rpi1
